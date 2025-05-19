@@ -1,0 +1,31 @@
+# Connect to Microsoft Graph
+Connect-MgGraph -Scopes "UserAuthenticationMethod.ReadWrite.All"
+
+# Import user list
+$users = Import-Csv -Path "C:\Path\To\users.csv"
+
+# Log file
+$logFile = "C:\Path\To\MFAResets_$(Get-Date -Format 'yyyyMMdd_HHmm').log"
+Add-Content -Path $logFile -Value "`n--- MFA Method Reset Log: $(Get-Date) ---`n"
+
+foreach ($user in $users) {
+    try {
+        $methods = Get-MgUserAuthenticationMethod -UserId $user.UserPrincipalName
+
+        foreach ($method in $methods) {
+            Write-Host "Removing method '$($method.ODataType)' for $($user.UserPrincipalName)..." -ForegroundColor Yellow
+            Remove-MgUserAuthenticationMethod -UserId $user.UserPrincipalName -AuthenticationMethodId $method.Id -ErrorAction Stop
+
+            # Log each removal
+            $successMsg = "[$(Get-Date)] Removed $($method.ODataType) for $($user.UserPrincipalName)"
+            Add-Content -Path $logFile -Value $successMsg
+        }
+
+        Write-Host "All MFA methods reset for $($user.UserPrincipalName)" -ForegroundColor Green
+    }
+    catch {
+        $errorMsg = "[$(Get-Date)] Error resetting MFA for $($user.UserPrincipalName): $_"
+        Write-Host $errorMsg -ForegroundColor Red
+        Add-Content -Path $logFile -Value $errorMsg
+    }
+}
